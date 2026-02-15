@@ -1,25 +1,27 @@
 {
   "name": "2dpunch",
-  "private": true,
-  "version": "0.1.0",
-  "workspaces": [
-    "apps/*"
-  ],
+  "version": "1.0.0",
+  "main": "index.ts",
   "scripts": {
-    "dev": "npm-run-all --parallel dev:api dev:web",
-    "dev:api": "npm --workspace @2dpunch/api run dev",
-    "dev:api:supabase": "DATA_PROVIDER=supabase npm --workspace @2dpunch/api run dev",
-    "dev:mobile": "npm --workspace mobile run start",
-    "dev:web": "npm --workspace @2dpunch/web run dev",
-    "mobile:build:preview:ios": "npm --workspace mobile run eas:build:preview:ios",
-    "mobile:build:preview:android": "npm --workspace mobile run eas:build:preview:android",
-    "mobile:build:prod:ios": "npm --workspace mobile run eas:build:prod:ios",
-    "mobile:build:prod:android": "npm --workspace mobile run eas:build:prod:android",
-    "build": "npm-run-all build:api build:web",
-    "build:api": "npm --workspace @2dpunch/api run build",
-    "build:web": "npm --workspace @2dpunch/web run build"
+    "start": "expo start",
+    "start:tunnel": "expo start --tunnel",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "start:tunnel:codespace": "EXPO_PUBLIC_SUPABASE_URL=$EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY=$EXPO_PUBLIC_SUPABASE_ANON_KEY expo start --tunnel"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "expo": "~54.0.33",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-url-polyfill": "^3.0.0"
   },
   "devDependencies": {
-    "npm-run-all": "^4.1.5"
-  }
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  },
+  "private": true
 }

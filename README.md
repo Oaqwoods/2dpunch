@@ -1,109 +1,61 @@
-# 2dpunch
+# 2dpunch (Expo + Supabase)
 
-Hybrid short-form + long-form social video MVP (TikTok + Tubi style) with full frontend and backend scaffolding.
-
-## What is implemented
-
-- Authentication: sign up, sign in, current session, logout, logout-all
-- Shorts feed with likes, comments, and `Watch Full` linkage
-- Watchroom long-form sections (continue watching, trending, from liked clips)
-- Creator upload stubs for full videos and teaser clips
-- Profile, follow creators, watchlist toggles, inbox placeholder
-- In-memory repositories designed to be replaced by your DB layer
-- Repository provider mode: in-memory (default) or Supabase
+Fresh rebuild using React Native (Expo) and Supabase.
 
 ## Stack
 
-- `apps/api`: Node.js + Express
-- `apps/web`: React + Vite
-- Root workspace: npm workspaces
+- Expo + React Native + TypeScript
+- Supabase Auth (email/password)
+- Supabase Postgres (`posts` table)
 
-## Run
+## Setup
+
+1. Install dependencies:
 
 ```bash
 npm install
-npm run dev
 ```
 
-Apps:
-
-- Web: http://localhost:5173
-- API: http://localhost:4000
-
-## Data provider mode
-
-Default local mode (in-memory):
+2. Configure env vars:
 
 ```bash
-npm --workspace @2dpunch/api run dev
+cp .env.example .env
 ```
 
-Supabase mode:
+Set these values in `.env`:
 
-```bash
-cp apps/api/.env.example apps/api/.env
-# fill SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
-DATA_PROVIDER=supabase npm --workspace @2dpunch/api run dev
-```
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
-Supabase schema:
+3. Create DB schema in Supabase SQL Editor:
 
-- `docs/supabase-schema.sql`
+- Run [docs/supabase-schema.sql](docs/supabase-schema.sql)
 
-## Expo mobile (Phase 1)
-
-The repo now includes an Expo client in `apps/mobile` with:
-
-- Sign in
-- For You feed
-- Watchroom (open full video, search, save progress)
-- Create (full video + teaser clip)
-- Inbox activity
-- Profile analytics + logout + logout-all
-- React Navigation tab structure
-- Action-level loading and success/error banners
-
-Run:
-
-```bash
-npm --workspace mobile run start
-```
-
-Set the API URL for Expo:
-
-```bash
-EXPO_PUBLIC_API_BASE_URL=http://YOUR_LAN_IP:4000 npm --workspace mobile run start
-```
-
-URL tips:
-
-- Android emulator: `http://10.0.2.2:4000`
-- iOS simulator: `http://localhost:4000`
-- Physical device: `http://<your-computer-lan-ip>:4000`
-
-Store prep checklist:
-
-- See `docs/mobile-store-readiness.md`
-
-## Demo account
+4. (Optional) Create demo account in Supabase Auth:
 
 - Email: `demo@pathstream.app`
 - Password: `password123`
 
-## Pre-Supabase completion checklist
+## Run
 
-- See `docs/feature-checklist.md`
+```bash
+npm run start
+```
 
-## Phase 4 release docs
+Tunnel mode (recommended for Expo Go on phone):
 
-- Store readiness checklist: `docs/mobile-store-readiness.md`
-- End-to-end release runbook: `docs/phase4-release-runbook.md`
+```bash
+npm run start:tunnel
+```
 
-## Swap in your DB
+## MVP features included
 
-The backend data layer is centralized in:
+- Sign up / Sign in / Sign out
+- Persistent session via AsyncStorage
+- Create post (title + body)
+- Feed list of recent posts
 
-- `apps/api/src/repositories/userRepository.js`
-- `apps/api/src/repositories/contentRepository.js`
+## Notes
 
-Replace those repository implementations with DB-backed logic while keeping route contracts unchanged.
+- If login fails with "Network request failed", restart Expo with env vars loaded and `npm run start:tunnel`.
+- If using Codespaces, ensure your Supabase project URL/key are valid and active.

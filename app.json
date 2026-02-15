@@ -1,8 +1,7 @@
 {
   "expo": {
-    "name": "2dpunch Mobile",
-    "slug": "2dpunch-mobile",
-    "scheme": "pathstream",
+    "name": "2dpunch",
+    "slug": "2dpunch",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,18 +13,15 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.oaqwoods.pathstream",
-      "buildNumber": "1"
+      "supportsTablet": true
     },
     "android": {
-      "package": "com.oaqwoods.pathstream",
-      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
