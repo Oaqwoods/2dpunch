@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
+import { createSupabaseClient } from '../lib/supabase';
 import type { RootStackParamList, TabParamList } from '../types';
+
+const supabase = createSupabaseClient();
 import FeedScreen from '../screens/FeedScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -26,6 +29,35 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 }
 
 function MainTabs({ userId }: { userId: string }) {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('read', false);
+      setUnreadCount(count ?? 0);
+    };
+
+    void fetchUnread();
+
+    const channel = supabase
+      .channel(`notif-badge-${userId}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => { void fetchUnread(); }
+      )
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => { void fetchUnread(); }
+      )
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, [userId]);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -38,7 +70,11 @@ function MainTabs({ userId }: { userId: string }) {
       })}
     >
       <Tab.Screen name="Feed" component={FeedScreen} />
-      <Tab.Screen name="Notifications" component={NotificationsScreen} />
+      <Tab.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ tabBarBadge: unreadCount > 0 ? unreadCount : undefined }}
+      />
       <Tab.Screen
         name="MyProfile"
         children={() => <ProfileScreen userId={userId} isSelf />}

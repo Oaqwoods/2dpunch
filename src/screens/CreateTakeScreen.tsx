@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { createSupabaseClient } from '../lib/supabase';
 import { extractDomain, scoreDomain, calcAverageTrust, tierColor } from '../lib/trustScore';
 import TrustBadge from '../components/TrustBadge';
+import Toast from '../components/Toast';
 import type { Category } from '../types';
 
 const supabase = createSupabaseClient();
@@ -36,6 +37,7 @@ export default function CreateTakeScreen() {
   const [sources, setSources] = useState<PendingSource[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
 
   const previewScore = calcAverageTrust(sources.map((s) => s.score));
 
@@ -112,7 +114,8 @@ export default function CreateTakeScreen() {
         await supabase.rpc('refresh_take_trust_score', { p_take_id: take.id });
       }
 
-      nav.goBack();
+      setToast({ visible: true, message: 'Take posted! 🔥' });
+      setTimeout(() => nav.goBack(), 1200);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to post take';
       // Rate limit handling
@@ -243,6 +246,11 @@ export default function CreateTakeScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
+      <Toast
+        message={toast.message}
+        visible={toast.visible}
+        onHide={() => setToast({ visible: false, message: '' })}
+      />
     </SafeAreaView>
   );
 }

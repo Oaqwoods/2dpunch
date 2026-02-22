@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Toast from '../components/Toast';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createSupabaseClient } from '../lib/supabase';
 import { extractDomain, scoreDomain, calcAverageTrust, tierColor, trustColor } from '../lib/trustScore';
@@ -37,6 +38,11 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
   const [pendingSources, setPendingSources] = useState<PendingSource[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+
+  function showToast(message: string) {
+    setToast({ visible: true, message });
+  }
 
   const previewScore = calcAverageTrust(pendingSources.map((s) => s.score));
 
@@ -121,6 +127,7 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
       setChallengeBody('');
       setPendingSources([]);
       setShowForm(false);
+      showToast('Challenge dropped! ⚔️');
       await load();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to challenge';
@@ -229,6 +236,7 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
                 onChangeText={setChallengeBody}
                 maxLength={500}
               />
+              <Text style={styles.charCount}>{challengeBody.length}/500</Text>
               <Text style={styles.label}>Add Receipts</Text>
               <View style={styles.row}>
                 <TextInput
@@ -275,6 +283,13 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
           )}
 
           {/* ── CHALLENGES ── */}
+          {challenges.length === 0 && !loading && (
+            <View style={styles.emptyChallenges}>
+              <Text style={styles.emptyChallengesIcon}>🤫</Text>
+              <Text style={styles.emptyChallengesText}>No challenges yet.</Text>
+              <Text style={styles.emptyChallengesSubtext}>Dare to disagree?</Text>
+            </View>
+          )}
           {challenges.length > 0 && (
             <>
               <Text style={styles.challengesTitle}>⚔️ Challenges ({challenges.length})</Text>
@@ -318,6 +333,11 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      <Toast
+        message={toast.message}
+        visible={toast.visible}
+        onHide={() => setToast({ visible: false, message: '' })}
+      />
     </SafeAreaView>
   );
 }
@@ -435,4 +455,13 @@ const styles = StyleSheet.create({
   vsSegment: { height: 6, borderRadius: 3 },
   vsLabel: { color: '#555', fontSize: 11, fontWeight: '700' },
   vsScores: { flexDirection: 'row', justifyContent: 'space-between' },
+  charCount: { color: '#555', fontSize: 12, textAlign: 'right', marginTop: 2 },
+  emptyChallenges: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 4,
+  },
+  emptyChallengesIcon: { fontSize: 36, marginBottom: 6 },
+  emptyChallengesText: { color: '#888', fontSize: 15, fontWeight: '600' },
+  emptyChallengesSubtext: { color: '#555', fontSize: 13 },
 });
