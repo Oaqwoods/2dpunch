@@ -16,13 +16,14 @@ import Toast from '../components/Toast';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createSupabaseClient } from '../lib/supabase';
 import { extractDomain, scoreDomain, calcAverageTrust, tierColor, trustColor } from '../lib/trustScore';
+import { fetchUrlTitle } from '../lib/urlMetadata';
 import TrustBadge from '../components/TrustBadge';
 import type { Challenge, RootStackParamList, Source, Take } from '../types';
 
 const supabase = createSupabaseClient();
 type Props = NativeStackScreenProps<RootStackParamList, 'TakeDetail'>;
 
-interface PendingSource { url: string; domain: string; tier: string; score: number; }
+interface PendingSource { url: string; domain: string; tier: string; score: number; title: string; fetching: boolean; }
 
 function AnimatedVsBar({
   origScore, chalScore, origColor, chalColor,
@@ -66,6 +67,8 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  const [likedChallengeIds, setLikedChallengeIds] = useState<Set<string>>(new Set());
+  const [likingChallengeId, setLikingChallengeId] = useState<string | null>(null);
 
   function showToast(message: string) {
     setToast({ visible: true, message });
@@ -95,7 +98,16 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
       ]);
       if (takeRes.error) throw takeRes.error;
       setTake(takeRes.data);
-      setChallenges(challengeRes.data ?? []);
+      const raw = challengeRes.data ?? [];
+      const now = Date.now();
+      const sorted = [...raw].sort((a, b) => {
+        const rank = (c: typeof a) => {
+          const ageH = (now - new Date(c.created_at).getTime()) / 3_600_000;
+          return (c.likes_count * 0.6 + Number(c.trust_score) * 0.4) / Math.pow(ageH + 2, 1.5);
+        };
+        return rank(b) - rank(a);
+      });
+      setChallenges(sorted);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
@@ -105,17 +117,82 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
-  function addSource() {
-    let url = sourceUrl.trim();
+  // Fetch which challenges the current user has already liked
+  useEffect(() => {
+    if (!myId || challenges.length === 0) return;
+    const ids = challenges.map((c) => c.id);
+    void supabase
+      .from('likes')
+      .select('challenge_id')
+      .eq('user_id', myId)
+      .in('challenge_id', ids)
+      .then(({ data }) => {
+        if (data) setLikedChallengeIds(new Set(data.map((r) => r.challenge_id as string)));
+      });
+  }, [myId, challenges.length]);
+
+  const resolveAndAddSource = useCallback((rawUrl: string) => {
+    let url = rawUrl.trim();
     if (!url) return;
     if (pendingSources.length >= 5) { setFormError('Max 5 sources'); return; }
     if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
     try { new URL(url); } catch { setFormError('Enter a valid URL'); return; }
     const domain = extractDomain(url);
     const { tier, score } = scoreDomain(domain);
-    setPendingSources((p) => [...p, { url, domain, tier, score }]);
+    setPendingSources((p) => [...p, { url, domain, tier, score, title: '', fetching: true }]);
     setSourceUrl('');
     setFormError('');
+    fetchUrlTitle(url).then((title) =>
+      setPendingSources((p) => p.map((s) => s.url === url ? { ...s, title, fetching: false } : s))
+    );
+  }, [pendingSources.length]);
+
+  // Auto-add when a full URL is pasted into the source field
+  useEffect(() => {
+    if (
+      (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) &&
+      sourceUrl.length > 12 &&
+      !sourceUrl.includes(' ')
+    ) {
+      const timer = setTimeout(() => resolveAndAddSource(sourceUrl), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [sourceUrl, resolveAndAddSource]);
+
+  function addSource() { resolveAndAddSource(sourceUrl); }
+
+  async function handleChallengeLike(challengeId: string) {
+    if (!myId || likingChallengeId) return;
+    setLikingChallengeId(challengeId);
+    const liked = likedChallengeIds.has(challengeId);
+    // Optimistic update
+    setChallenges((prev) =>
+      prev.map((c) => c.id === challengeId ? { ...c, likes_count: c.likes_count + (liked ? -1 : 1) } : c)
+    );
+    setLikedChallengeIds((prev) => {
+      const next = new Set(prev);
+      if (liked) next.delete(challengeId); else next.add(challengeId);
+      return next;
+    });
+    try {
+      if (liked) {
+        await supabase.from('likes').delete().match({ user_id: myId, challenge_id: challengeId });
+      } else {
+        await supabase.from('likes').insert({ user_id: myId, challenge_id: challengeId });
+      }
+    } catch {
+      // Revert
+      setChallenges((prev) =>
+        prev.map((c) => c.id === challengeId ? { ...c, likes_count: c.likes_count + (liked ? 1 : -1) } : c)
+      );
+      setLikedChallengeIds((prev) => {
+        const next = new Set(prev);
+        if (liked) next.add(challengeId); else next.delete(challengeId);
+        return next;
+      });
+    } finally {
+      setLikingChallengeId(null);
+    }
   }
 
   async function submitChallenge() {
@@ -223,10 +300,12 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
                 {take.sources.map((s: Source) => (
                   <View key={s.id} style={styles.sourceItem}>
                     <View style={[styles.tierDot, { backgroundColor: tierColor(s.trust_tier) }]} />
-                    <Text style={styles.sourceDomain}>{s.domain}</Text>
-                    <Text style={[styles.sourceTier, { color: tierColor(s.trust_tier) }]}>
-                      {s.trust_tier} · {s.score}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      {s.title ? <Text style={styles.sourceTitle} numberOfLines={1}>{s.title}</Text> : null}
+                      <Text style={[styles.sourceDomain, { color: tierColor(s.trust_tier) }]}>
+                        {s.domain} · {s.score}pts
+                      </Text>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -286,11 +365,16 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
               {pendingSources.map((s, i) => (
                 <View key={i} style={styles.sourceItem}>
                   <View style={[styles.tierDot, { backgroundColor: tierColor(s.tier as 'high' | 'mid' | 'low') }]} />
-                  <Text style={styles.sourceDomain}>{s.domain}</Text>
-                  <Text style={[styles.sourceTier, { color: tierColor(s.tier as 'high' | 'mid' | 'low') }]}>
-                    {s.tier} · {s.score}
-                  </Text>
-                  <Pressable onPress={() => setPendingSources((p) => p.filter((_, j) => j !== i))}>
+                  <View style={{ flex: 1 }}>
+                    {s.fetching
+                      ? <Text style={styles.sourceFetching}>🔍 Fetching headline…</Text>
+                      : s.title ? <Text style={styles.sourceTitle} numberOfLines={1}>{s.title}</Text> : null
+                    }
+                    <Text style={[styles.sourceDomain, { color: tierColor(s.tier as 'high' | 'mid' | 'low') }]}>
+                      {s.domain} · {s.score}pts
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => setPendingSources((p) => p.filter((_, j) => j !== i))} hitSlop={8}>
                     <Text style={styles.removeBtn}>✕</Text>
                   </Pressable>
                 </View>
@@ -336,10 +420,12 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
                       {c.challenge_sources.map((s) => (
                         <View key={s.id} style={styles.sourceItem}>
                           <View style={[styles.tierDot, { backgroundColor: tierColor(s.trust_tier) }]} />
-                          <Text style={styles.sourceDomain}>{s.domain}</Text>
-                          <Text style={[styles.sourceTier, { color: tierColor(s.trust_tier) }]}>
-                            {s.trust_tier} · {s.score}
-                          </Text>
+                          <View style={{ flex: 1 }}>
+                            {s.title ? <Text style={styles.sourceTitle} numberOfLines={1}>{s.title}</Text> : null}
+                            <Text style={[styles.sourceDomain, { color: tierColor(s.trust_tier) }]}>
+                              {s.domain} · {s.score}pts
+                            </Text>
+                          </View>
                         </View>
                       ))}
                     </View>
@@ -358,6 +444,20 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
                       Challenge: {Math.round(c.trust_score)}
                     </Text>
                   </View>
+                  {/* Like button */}
+                  <Pressable
+                    style={styles.challengeLikeBtn}
+                    onPress={() => void handleChallengeLike(c.id)}
+                    disabled={c.user_id === myId || likingChallengeId === c.id}
+                  >
+                    <Text style={[
+                      styles.challengeLikeBtnText,
+                      likedChallengeIds.has(c.id) && styles.challengeLikedText,
+                      c.user_id === myId && { opacity: 0.3 },
+                    ]}>
+                      {likedChallengeIds.has(c.id) ? '❤️' : '🤍'} {c.likes_count}
+                    </Text>
+                  </Pressable>
                 </View>
               ))}
             </>
@@ -405,9 +505,14 @@ const styles = StyleSheet.create({
   sourcesTitle: { color: '#888', fontSize: 13, fontWeight: '600' },
   sourceItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tierDot: { width: 7, height: 7, borderRadius: 4 },
-  sourceDomain: { flex: 1, color: '#bbb', fontSize: 12 },
+  sourceDomain: { fontSize: 12 },
+  sourceTitle: { color: '#ccc', fontSize: 12, fontWeight: '600' },
+  sourceFetching: { color: '#555', fontSize: 11, fontStyle: 'italic' },
   sourceTier: { fontSize: 12, fontWeight: '600' },
   removeBtn: { color: '#555' },
+  challengeLikeBtn: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2 },
+  challengeLikeBtnText: { color: '#888', fontSize: 13 },
+  challengeLikedText: { color: '#f43f5e' },
   stats: { flexDirection: 'row', gap: 16 },
   stat: { color: '#888', fontSize: 13 },
   challengeBtn: {

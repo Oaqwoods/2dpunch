@@ -303,3 +303,26 @@ create or replace trigger on_like_deleted
 -- Migration: add title column to sources and challenge_sources (safe, nullable)
 alter table public.sources add column if not exists title text;
 alter table public.challenge_sources add column if not exists title text;
+
+-- ─── HATE SPEECH / SLUR FILTER ──────────────────────────────────────────────
+-- Blocks known slurs and hate terms before insert on takes and challenges.
+-- Extend the regex alternation to add new terms as needed.
+create or replace function public.check_hate_speech()
+returns trigger language plpgsql security definer as $$
+begin
+  -- Case-insensitive whole-word match against a blocklist of hate terms.
+  -- \m = start-of-word, \M = end-of-word in PostgreSQL POSIX regex.
+  if new.body ~* '\m(nigger|nigga|chink|spic|kike|gook|raghead|wetback|tranny|faggot|dyke|cracker|coon|towelhead|beaner|zipperhead|redskin|squaw|half-breed|sand\s*nigger)\M' then
+    raise exception 'Your post was blocked because it contains language that violates community guidelines.';
+  end if;
+  return new;
+end;
+$$;
+
+create or replace trigger check_take_hate_speech
+  before insert on public.takes
+  for each row execute function public.check_hate_speech();
+
+create or replace trigger check_challenge_hate_speech
+  before insert on public.challenges
+  for each row execute function public.check_hate_speech();
