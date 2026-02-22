@@ -98,6 +98,19 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
               </Text>
             </View>
 
+            {/* Username setup prompt */}
+            {isSelf && !editing && profile?.bio === '' && (
+              <Pressable
+                style={styles.setupBanner}
+                onPress={() => setEditing(true)}
+              >
+                <Text style={styles.setupBannerText}>
+                  👋 Add a bio and customize your username to complete your profile
+                </Text>
+                <Text style={styles.setupBannerCta}>Set up →</Text>
+              </Pressable>
+            )}
+
             {editing ? (
               <View style={styles.editForm}>
                 <TextInput
@@ -241,4 +254,16 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: { color: '#888', fontWeight: '600' },
   empty: { color: '#555', textAlign: 'center', marginTop: 20 },
+  setupBanner: {
+    width: '100%',
+    backgroundColor: '#1c2a1a',
+    borderWidth: 1,
+    borderColor: '#2ec4b655',
+    borderRadius: 12,
+    padding: 12,
+    gap: 4,
+    marginBottom: 4,
+  },
+  setupBannerText: { color: '#aaa', fontSize: 13, lineHeight: 18 },
+  setupBannerCta: { color: '#2ec4b6', fontWeight: '700', fontSize: 13 },
 });

@@ -38,7 +38,9 @@ export default function TakeCard({ take, onLike, onProfile }: Props) {
         </Pressable>
         <View style={styles.headerRight}>
           <View style={[styles.categoryPill, take.category === 'politics' ? styles.politics : styles.sports]}>
-            <Text style={styles.categoryText}>{take.category}</Text>
+            <Text style={[styles.categoryText, take.category === 'politics' ? styles.categoryPolitics : styles.categorySports]}>
+              {take.category}
+            </Text>
           </View>
           <Text style={styles.time}>{timeAgo(take.created_at)}</Text>
         </View>
@@ -115,9 +117,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  politics: { backgroundColor: '#1e3a5f' },
-  sports: { backgroundColor: '#1a3a1a' },
-  categoryText: { color: '#aaa', fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
+  politics: { backgroundColor: '#3d1117' },
+  sports: { backgroundColor: '#0d2b2a' },
+  categoryText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  categoryPolitics: { color: '#e63946' },
+  categorySports: { color: '#2ec4b6' },
   body: { color: '#e8e8e8', fontSize: 15, lineHeight: 22 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag: { color: '#888', fontSize: 12 },

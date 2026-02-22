@@ -42,8 +42,9 @@ export default function CreateTakeScreen() {
   const previewScore = calcAverageTrust(sources.map((s) => s.score));
 
   function addSource() {
-    const url = sourceUrl.trim();
+    let url = sourceUrl.trim();
     if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
     if (sources.length >= 5) {
       setError('Max 5 sources per take');
       return;
@@ -146,7 +147,12 @@ export default function CreateTakeScreen() {
                 style={[styles.categoryBtn, category === c && styles.categoryActive]}
                 onPress={() => setCategory(c)}
               >
-                <Text style={[styles.categoryText, category === c && styles.categoryTextActive]}>
+                <Text style={[
+                  styles.categoryText,
+                  category === c && styles.categoryTextActive,
+                  category === c && c === 'politics' && styles.categoryPoliticsActive,
+                  category === c && c === 'sports' && styles.categorySportsActive,
+                ]}>
                   {c === 'politics' ? '🏛 Politics' : '🏆 Sports'}
                 </Text>
               </Pressable>
@@ -294,8 +300,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryActive: { borderColor: '#1f6feb', backgroundColor: '#0d2a4a' },
-  categoryText: { color: '#555', fontWeight: '600' },
+  categoryText: { color: '#555', fontWeight: '700' },
   categoryTextActive: { color: '#fff' },
+  categoryPoliticsActive: { color: '#e63946' },
+  categorySportsActive: { color: '#2ec4b6' },
   addBtn: {
     backgroundColor: '#1f6feb',
     paddingHorizontal: 14,

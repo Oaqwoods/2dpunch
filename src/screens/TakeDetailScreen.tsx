@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,6 +23,32 @@ const supabase = createSupabaseClient();
 type Props = NativeStackScreenProps<RootStackParamList, 'TakeDetail'>;
 
 interface PendingSource { url: string; domain: string; tier: string; score: number; }
+
+function AnimatedVsBar({
+  origScore, chalScore, origColor, chalColor,
+}: { origScore: number; chalScore: number; origColor: string; chalColor: string }) {
+  const origFlex = useRef(new Animated.Value(0)).current;
+  const chalFlex = useRef(new Animated.Value(0)).current;
+  const targetOrig = origScore || 1;
+  const targetChal = chalScore || 1;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(origFlex, { toValue: targetOrig, duration: 700, useNativeDriver: false }),
+      Animated.timing(chalFlex, { toValue: targetChal, duration: 700, useNativeDriver: false }),
+    ]).start();
+  }, [origFlex, chalFlex, targetOrig, targetChal]);
+
+  return (
+    <View style={{ height: 6, flexDirection: 'row', borderRadius: 3, overflow: 'hidden', marginTop: 4 }}>
+      <Animated.View style={{ flex: origFlex, height: 6, backgroundColor: origColor }} />
+      <View style={{ width: 20, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: '#555', fontSize: 9, fontWeight: '700' }}>vs</Text>
+      </View>
+      <Animated.View style={{ flex: chalFlex, height: 6, backgroundColor: chalColor }} />
+    </View>
+  );
+}
 
 export default function TakeDetailScreen({ route, navigation }: Props) {
   const { takeId } = route.params;
@@ -79,9 +106,10 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
   useEffect(() => { void load(); }, [load]);
 
   function addSource() {
-    const url = sourceUrl.trim();
+    let url = sourceUrl.trim();
     if (!url) return;
     if (pendingSources.length >= 5) { setFormError('Max 5 sources'); return; }
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
     try { new URL(url); } catch { setFormError('Enter a valid URL'); return; }
     const domain = extractDomain(url);
     const { tier, score } = scoreDomain(domain);
@@ -168,14 +196,16 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
           {/* ── TAKE ── */}
           <View style={styles.takeCard}>
             <View style={styles.cardHeader}>
               <Text style={styles.username}>@{take.profiles?.username}</Text>
               <View style={[styles.catPill, take.category === 'politics' ? styles.polCat : styles.spoCat]}>
-                <Text style={styles.catText}>{take.category}</Text>
+                <Text style={[styles.catText, { color: take.category === 'politics' ? '#e63946' : '#2ec4b6' }]}>
+                  {take.category}
+                </Text>
               </View>
             </View>
             <Text style={styles.takeBody}>{take.body}</Text>
@@ -314,11 +344,12 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
                       ))}
                     </View>
                   )}
-                  <View style={styles.vsBar}>
-                    <View style={[styles.vsSegment, { backgroundColor: trustColor(take.trust_score), flex: take.trust_score || 1 }]} />
-                    <Text style={styles.vsLabel}>vs</Text>
-                    <View style={[styles.vsSegment, { backgroundColor: trustColor(c.trust_score), flex: c.trust_score || 1 }]} />
-                  </View>
+                  <AnimatedVsBar
+                    origScore={take.trust_score}
+                    chalScore={c.trust_score}
+                    origColor={trustColor(take.trust_score)}
+                    chalColor={trustColor(c.trust_score)}
+                  />
                   <View style={styles.vsScores}>
                     <Text style={{ color: trustColor(take.trust_score), fontSize: 12 }}>
                       Original: {Math.round(take.trust_score)}
@@ -357,9 +388,9 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   username: { color: '#a0c4ff', fontWeight: '600' },
   catPill: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  polCat: { backgroundColor: '#1e3a5f' },
-  spoCat: { backgroundColor: '#1a3a1a' },
-  catText: { color: '#aaa', fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
+  polCat: { backgroundColor: '#3d1117' },
+  spoCat: { backgroundColor: '#0d2b2a' },
+  catText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
   takeBody: { color: '#e8e8e8', fontSize: 16, lineHeight: 24 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag: { color: '#888', fontSize: 12 },

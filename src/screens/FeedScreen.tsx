@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -11,8 +10,10 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 import { createSupabaseClient } from '../lib/supabase';
 import TakeCard from '../components/TakeCard';
+import SkeletonCard from '../components/SkeletonCard';
 import type { Category, RootStackParamList, Take } from '../types';
 
 const supabase = createSupabaseClient();
@@ -82,6 +83,7 @@ export default function FeedScreen() {
 
   const handleLike = async (takeId: string, liked: boolean) => {
     if (!myId) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Optimistic update
     setTakes((prev) =>
       prev.map((t) =>
@@ -141,7 +143,13 @@ export default function FeedScreen() {
       {error ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : loading ? (
-        <ActivityIndicator color="#fff" style={{ marginTop: 40 }} />
+        <View style={styles.list}>
+          {[1, 2, 3].map((k) => (
+            <View key={k} style={{ marginBottom: 10 }}>
+              <SkeletonCard />
+            </View>
+          ))}
+        </View>
       ) : (
         <FlatList
           data={takes}
