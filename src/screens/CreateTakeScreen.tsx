@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { createSupabaseClient } from '../lib/supabase';
 import { extractDomain, scoreDomain, calcAverageTrust, tierColor } from '../lib/trustScore';
+import { fetchUrlTitle } from '../lib/urlMetadata';
 import TrustBadge from '../components/TrustBadge';
 import Toast from '../components/Toast';
 import type { Category } from '../types';
@@ -25,6 +25,8 @@ interface PendingSource {
   domain: string;
   tier: string;
   score: number;
+  title: string;
+  fetching: boolean;
 }
 
 export default function CreateTakeScreen() {
@@ -41,25 +43,41 @@ export default function CreateTakeScreen() {
 
   const previewScore = calcAverageTrust(sources.map((s) => s.score));
 
-  function addSource() {
-    let url = sourceUrl.trim();
+  const resolveAndAddSource = useCallback((rawUrl: string) => {
+    let url = rawUrl.trim();
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-    if (sources.length >= 5) {
-      setError('Max 5 sources per take');
-      return;
-    }
-    try {
-      new URL(url); // validate
-    } catch {
-      setError('Enter a valid URL including https://');
-      return;
-    }
+    if (sources.length >= 5) { setError('Max 5 receipts'); return; }
+    try { new URL(url); } catch { setError('Enter a valid URL'); return; }
     const domain = extractDomain(url);
     const { tier, score } = scoreDomain(domain);
-    setSources((prev) => [...prev, { url, domain, tier, score }]);
+    const pending: PendingSource = { url, domain, tier, score, title: '', fetching: true };
+    setSources((prev) => [...prev, pending]);
     setSourceUrl('');
     setError('');
+    fetchUrlTitle(url).then((title) =>
+      setSources((prev) =>
+        prev.map((s) => (s.url === url ? { ...s, title, fetching: false } : s))
+      )
+    );
+  }, [sources.length]);
+
+  // Auto-add when a full URL is pasted
+  useEffect(() => {
+    if (
+      (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) &&
+      sourceUrl.length > 12 &&
+      !sourceUrl.includes(' ')
+    ) {
+      const timer = setTimeout(() => {
+        resolveAndAddSource(sourceUrl);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [sourceUrl, resolveAndAddSource]);
+
+  function addSource() {
+    resolveAndAddSource(sourceUrl);
   }
 
   function removeSource(idx: number) {
@@ -72,6 +90,10 @@ export default function CreateTakeScreen() {
     setTags((prev) => [...prev, t]);
     setTagInput('');
   }
+
+  // Live trust meter width (0-100%)
+  const trustPct = Math.min(previewScore, 100);
+  const trustMeterColor = trustPct >= 70 ? '#22c55e' : trustPct >= 40 ? '#f59e0b' : trustPct > 0 ? '#ef4444' : '#2a2a2a';
 
   async function submit() {
     setError('');
@@ -197,46 +219,63 @@ export default function CreateTakeScreen() {
             </View>
           )}
 
-          {/* Sources */}
-          <Text style={styles.label}>
-            Receipts/Sources{' '}
-            <Text style={styles.subLabel}>({sources.length}/5 — affects trust score)</Text>
-          </Text>
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="https://..."
-              placeholderTextColor="#444"
-              value={sourceUrl}
-              onChangeText={setSourceUrl}
-              autoCapitalize="none"
-              keyboardType="url"
-              onSubmitEditing={addSource}
-              returnKeyType="done"
-            />
-            <Pressable style={styles.addBtn} onPress={addSource}>
-              <Text style={styles.addBtnText}>Add</Text>
-            </Pressable>
+          {/* Receipts / Sources */}
+          <View style={styles.receiptsHeader}>
+            <Text style={styles.label}>
+              📎 Receipts{' '}
+              <Text style={styles.subLabel}>({sources.length}/5 — auto-scored by domain)</Text>
+            </Text>
           </View>
 
+          {/* Trust meter */}
+          <View style={styles.trustMeterRow}>
+            <View style={styles.trustMeterTrack}>
+              <View style={[styles.trustMeterFill, { width: `${trustPct}%`, backgroundColor: trustMeterColor }]} />
+            </View>
+            {sources.length > 0
+              ? <TrustBadge score={previewScore} size="sm" />
+              : <Text style={styles.trustMeterLabel}>Add receipts to boost trust</Text>
+            }
+          </View>
+
+          {/* Receipt cards */}
           {sources.map((s, i) => (
             <View key={i} style={styles.sourceRow}>
               <View style={[styles.tierDot, { backgroundColor: tierColor(s.tier as 'high' | 'mid' | 'low') }]} />
-              <Text style={styles.sourceDomain} numberOfLines={1}>{s.domain}</Text>
-              <Text style={[styles.sourceTier, { color: tierColor(s.tier as 'high' | 'mid' | 'low') }]}>
-                {s.tier} · {s.score}
-              </Text>
+              <View style={{ flex: 1 }}>
+                {s.fetching
+                  ? <Text style={styles.sourceFetching}>🔍 Fetching headline…</Text>
+                  : s.title
+                    ? <Text style={styles.sourceTitle} numberOfLines={1}>{s.title}</Text>
+                    : null
+                }
+                <Text style={[styles.sourceDomain, { color: tierColor(s.tier as 'high' | 'mid' | 'low') }]}>
+                  {s.domain} · {s.score}pts
+                </Text>
+              </View>
               <Pressable onPress={() => removeSource(i)} hitSlop={8}>
                 <Text style={styles.removeBtn}>✕</Text>
               </Pressable>
             </View>
           ))}
 
-          {/* Trust preview */}
-          {sources.length > 0 && (
-            <View style={styles.trustPreview}>
-              <Text style={styles.trustPreviewLabel}>Trust Score Preview</Text>
-              <TrustBadge score={previewScore} />
+          {/* URL input — paste detects automatically */}
+          {sources.length < 5 && (
+            <View style={styles.row}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder={sources.length === 0 ? '🔗 Paste a URL — headline auto-fills…' : 'Add another receipt…'}
+                placeholderTextColor="#444"
+                value={sourceUrl}
+                onChangeText={setSourceUrl}
+                autoCapitalize="none"
+                keyboardType="url"
+                onSubmitEditing={addSource}
+                returnKeyType="done"
+              />
+              <Pressable style={styles.addBtn} onPress={addSource}>
+                <Text style={styles.addBtnText}>Add</Text>
+              </Pressable>
             </View>
           )}
 
@@ -331,17 +370,23 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   tierDot: { width: 8, height: 8, borderRadius: 4 },
-  sourceDomain: { flex: 1, color: '#ccc', fontSize: 13 },
-  sourceTier: { fontSize: 12, fontWeight: '600' },
-  removeBtn: { color: '#555', fontSize: 14 },
-  trustPreview: {
+  receiptsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  trustMeterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
+  trustMeterTrack: {
+    flex: 1,
+    height: 6,
     backgroundColor: '#1a1a1a',
-    borderRadius: 10,
-    padding: 12,
-    gap: 8,
+    borderRadius: 3,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#2a2a2a',
   },
+  trustMeterFill: { height: 6, borderRadius: 3, minWidth: 4 },
+  trustMeterLabel: { color: '#444', fontSize: 12 },
+  sourceFetching: { color: '#555', fontSize: 12, fontStyle: 'italic' },
+  sourceTitle: { color: '#ccc', fontSize: 13, fontWeight: '600' },
+  sourceDomain: { fontSize: 12, marginTop: 1 },
+  removeBtn: { color: '#555', fontSize: 14 },
   trustPreviewLabel: { color: '#888', fontSize: 13 },
   error: { color: '#ef4444', fontSize: 13, textAlign: 'center' },
   submitBtn: {

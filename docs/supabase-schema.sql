@@ -299,3 +299,7 @@ $$;
 create or replace trigger on_like_deleted
   after delete on public.likes
   for each row execute function public.decrement_likes();
+
+-- Migration: add title column to sources and challenge_sources (safe, nullable)
+alter table public.sources add column if not exists title text;
+alter table public.challenge_sources add column if not exists title text;

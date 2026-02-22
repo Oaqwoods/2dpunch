@@ -9,6 +9,7 @@ interface Props {
   take: Take;
   onLike: (takeId: string, liked: boolean) => void;
   onProfile: (userId: string) => void;
+  onLongPress?: (take: Take) => void;
 }
 
 function timeAgo(iso: string): string {
@@ -21,13 +22,15 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-export default function TakeCard({ take, onLike, onProfile }: Props) {
+export default function TakeCard({ take, onLike, onProfile, onLongPress }: Props) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={() => nav.navigate('TakeDetail', { takeId: take.id })}
+      onLongPress={() => onLongPress?.(take)}
+      delayLongPress={350}
     >
       {/* Header */}
       <View style={styles.header}>

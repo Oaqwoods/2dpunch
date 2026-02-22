@@ -18,6 +18,7 @@ export interface Source {
   domain: string;
   trust_tier: TrustTier;
   score: number;
+  title?: string;
   created_at: string;
 }
 
@@ -28,6 +29,7 @@ export interface ChallengeSource {
   domain: string;
   trust_tier: TrustTier;
   score: number;
+  title?: string;
   created_at: string;
 }
 

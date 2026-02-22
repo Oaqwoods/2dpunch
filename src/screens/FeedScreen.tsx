@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { createSupabaseClient } from '../lib/supabase';
 import TakeCard from '../components/TakeCard';
 import SkeletonCard from '../components/SkeletonCard';
+import QuickChallengeSheet from '../components/QuickChallengeSheet';
 import type { Category, RootStackParamList, Take } from '../types';
 
 const supabase = createSupabaseClient();
@@ -28,6 +29,7 @@ export default function FeedScreen() {
   const [sortBy, setSortBy] = useState<'recent' | 'trust'>('recent');
   const [error, setError] = useState('');
   const [myId, setMyId] = useState<string | null>(null);
+  const [challengingTake, setChallengingTake] = useState<Take | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id ?? null));
@@ -171,10 +173,17 @@ export default function FeedScreen() {
               take={item}
               onLike={handleLike}
               onProfile={(uid) => nav.navigate('Profile', { userId: uid })}
+              onLongPress={(t) => setChallengingTake(t)}
             />
           )}
         />
       )}
+      <QuickChallengeSheet
+        take={challengingTake}
+        myId={myId}
+        onClose={() => setChallengingTake(null)}
+        onPosted={() => { void load(true); }}
+      />
     </SafeAreaView>
   );
 }
