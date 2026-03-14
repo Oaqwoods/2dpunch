@@ -17,6 +17,7 @@ export interface Profile {
   id: string;
   username: string;
   bio: string;
+  avatar_url: string | null;
   avg_trust_score: number;
   takes_count: number;
   followers_count: number;

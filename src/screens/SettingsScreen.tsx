@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createSupabaseClient } from '../lib/supabase';
@@ -16,10 +17,12 @@ import type { RootStackParamList } from '../types';
 
 const supabase = createSupabaseClient();
 const APP_VERSION = '1.0.0';
+const CONTACT_EMAIL = 'info@oaqwoods.app';
 
 export default function SettingsScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [signingOut, setSigningOut] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function handleSignOut() {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -34,6 +37,18 @@ export default function SettingsScreen() {
         },
       },
     ]);
+  }
+
+  async function copyEmail() {
+    await Clipboard.setStringAsync(CONTACT_EMAIL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function openEmail() {
+    void Linking.openURL(
+      `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('[2dpunch] Feedback')}`
+    );
   }
 
   return (
@@ -62,7 +77,7 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* ── Rate limits ──────────────────────────────────────────── */}
+        {/* ── Posting limits ───────────────────────────────────────── */}
         <Text style={styles.sectionHeader}>Posting Limits</Text>
         <View style={styles.card}>
           <InfoRow icon="🎯" label="Takes" value="10 per hour" />
@@ -72,21 +87,24 @@ export default function SettingsScreen() {
           <InfoRow icon="📎" label="Receipts per take" value="5 max" />
         </View>
 
-        {/* ── Trust scoring ────────────────────────────────────────── */}
-        <Text style={styles.sectionHeader}>Trust Score System</Text>
+        {/* ── Contact ──────────────────────────────────────────────── */}
+        <Text style={styles.sectionHeader}>Contact Us</Text>
         <View style={styles.card}>
-          <InfoRow icon="🟢" label="High tier (90 pts)" value="Gov, academic, wire services" />
-          <View style={styles.divider} />
-          <InfoRow icon="🟡" label="Mid tier (60 pts)" value="Established journalism & sports orgs" />
-          <View style={styles.divider} />
-          <InfoRow icon="🔴" label="Low / unknown (10–25 pts)" value="Social media or unrecognised domains" />
-          <View style={styles.divider} />
           <Pressable
             style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-            onPress={() => nav.navigate('SuggestSource')}
+            onPress={openEmail}
           >
-            <Text style={styles.rowLabel}>Think a site is rated wrong?</Text>
-            <Text style={styles.chevron}>›</Text>
+            <View style={styles.emailBlock}>
+              <Text style={styles.rowLabel}>✉️ Email us</Text>
+              <Text style={styles.emailAddress}>{CONTACT_EMAIL}</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.copyBtn, pressed && styles.pressed]}
+              onPress={copyEmail}
+              hitSlop={12}
+            >
+              <Text style={styles.copyBtnText}>{copied ? '✓ Copied' : 'Copy'}</Text>
+            </Pressable>
           </Pressable>
         </View>
 
@@ -94,18 +112,10 @@ export default function SettingsScreen() {
         <Text style={styles.sectionHeader}>About</Text>
         <View style={styles.card}>
           <InfoRow icon="📱" label="Version" value={APP_VERSION} />
-          <View style={styles.divider} />
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-            onPress={() => void Linking.openURL('https://github.com/Oaqwoods/2dpunch')}
-          >
-            <Text style={styles.rowLabel}>🐙 Source code</Text>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
         </View>
 
         <Text style={styles.footer}>
-          2dpunch — Debate with receipts.{'\n'}Rate limits and trust scoring protect the quality of debate.
+          2dpunch — Debate with receipts.
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -155,6 +165,17 @@ const styles = StyleSheet.create({
   rowLabelDestructive: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
   rowValue: { color: '#666', fontSize: 13 },
   chevron: { color: '#444', fontSize: 18, fontWeight: '300' },
+  emailBlock: { gap: 2 },
+  emailAddress: { color: '#666', fontSize: 12 },
+  copyBtn: {
+    backgroundColor: '#1f6feb22',
+    borderWidth: 1,
+    borderColor: '#1f6feb55',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  copyBtnText: { color: '#1f6feb', fontSize: 12, fontWeight: '700' },
   footer: {
     color: '#333',
     fontSize: 12,

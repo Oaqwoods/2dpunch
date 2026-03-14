@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createSupabaseClient } from '../lib/supabase';
@@ -37,6 +39,7 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
   const [saveError, setSaveError] = useState('');
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id ?? null));
@@ -143,6 +146,43 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
     }
   }
 
+  async function pickAvatar() {
+    if (!isSelf || !myId) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo library access to set a profile photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setAvatarUploading(true);
+    try {
+      // Fetch the image as a blob
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const ext = asset.uri.split('.').pop() ?? 'jpg';
+      const path = `${myId}/avatar.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, blob, { upsert: true, contentType: `image/${ext}` });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+      const avatar_url = `${urlData.publicUrl}?t=${Date.now()}`;
+      await supabase.from('profiles').update({ avatar_url }).eq('id', myId);
+      setProfile((p) => p ? { ...p, avatar_url } : p);
+    } catch (e: unknown) {
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Could not upload photo');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
   async function deleteTake(takeId: string) {
     Alert.alert('Delete Take', 'Delete this take permanently?', [
       { text: 'Cancel', style: 'cancel' },
@@ -172,12 +212,27 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListHeaderComponent={() => (
           <View style={styles.profileHeader}>
-            {/* Avatar placeholder */}
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {profile?.username?.[0]?.toUpperCase() ?? '?'}
-              </Text>
-            </View>
+            {/* Avatar */}
+            <Pressable
+              style={styles.avatarWrapper}
+              onPress={isSelf ? () => void pickAvatar() : undefined}
+              disabled={avatarUploading}
+            >
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {profile?.username?.[0]?.toUpperCase() ?? '?'}
+                  </Text>
+                </View>
+              )}
+              {isSelf && (
+                <View style={styles.avatarEditBadge}>
+                  <Text style={{ fontSize: 11 }}>{avatarUploading ? '…' : '📷'}</Text>
+                </View>
+              )}
+            </Pressable>
 
             {/* Username setup prompt */}
             {isSelf && !editing && profile?.bio === '' && (
@@ -291,6 +346,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f0f' },
   list: { padding: 14, paddingBottom: 40 },
   profileHeader: { gap: 10, marginBottom: 20, alignItems: 'center' },
+  avatarWrapper: {
+    width: 72,
+    height: 72,
+    marginBottom: 6,
+  },
   avatar: {
     width: 72,
     height: 72,
@@ -298,9 +358,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f6feb',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+  },
+  avatarImg: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   avatarText: { color: '#fff', fontSize: 30, fontWeight: '700' },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#333',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   profileName: { color: '#fff', fontSize: 20, fontWeight: '700' },
   profileBio: { color: '#888', fontSize: 14, textAlign: 'center' },
   statsRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 4 },

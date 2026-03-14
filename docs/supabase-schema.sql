@@ -529,3 +529,38 @@ begin
 end;
 $$;
 
+
+-- ─────────────────────────────────────────────
+-- MIGRATION 6: avatar_url on profiles + avatars storage bucket
+-- ─────────────────────────────────────────────
+
+-- 1. Add nullable avatar_url column
+alter table public.profiles
+  add column if not exists avatar_url text;
+
+-- 2. Create the storage bucket (public so avatars are readable without auth)
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+-- 3. Storage RLS: anyone can read
+create policy "avatars are publicly readable"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+-- 4. Storage RLS: authenticated users can upload to their own folder (user_id/*)
+create policy "users can upload own avatar"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- 5. Storage RLS: authenticated users can update/replace their own avatar
+create policy "users can update own avatar"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
