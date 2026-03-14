@@ -20,16 +20,32 @@ const HIGH_TIER_DOMAINS = new Set([
 ]);
 
 const MID_TIER_DOMAINS = new Set([
-  // General news
+  // US general news
   'nytimes.com', 'washingtonpost.com', 'wsj.com', 'ft.com',
   'economist.com', 'theguardian.com', 'bbc.com', 'bbc.co.uk',
   'npr.org', 'pbs.org', 'cnn.com', 'nbcnews.com', 'abcnews.go.com',
   'cbsnews.com', 'time.com', 'theatlantic.com', 'axios.com',
-  'politico.com', 'thehill.com',
+  'politico.com', 'thehill.com', 'usatoday.com', 'latimes.com',
+  'nypost.com', 'newsweek.com', 'forbes.com', 'businessinsider.com',
+  'motherjones.com', 'thedailybeast.com', 'vox.com', 'slate.com',
+  // International news
+  'aljazeera.com', 'skynews.com', 'sky.com',
+  'independent.co.uk', 'telegraph.co.uk', 'thetimes.co.uk',
+  'thesun.co.uk', 'dailymail.co.uk', 'mirror.co.uk', 'express.co.uk',
+  'abc.net.au', 'smh.com.au', 'theage.com.au', 'abc.net.au',
+  'cbc.ca', 'globeandmail.com', 'torontostar.com', 'nationalpost.com',
+  'lemonde.fr', 'lefigaro.fr', 'dw.com', 'spiegel.de',
+  'elpais.com', 'corriere.it', 'ansa.it',
+  'haaretz.com', 'timesofisrael.com', 'jpost.com',
+  'scmp.com', 'straitstimes.com', 'japantimes.co.jp',
+  'hindustantimes.com', 'thehindu.com', 'ndtv.com', 'timesofindia.com',
+  'arabnews.com', 'middleeasteye.net',
   // Sports
   'espn.com', 'nfl.com', 'nba.com', 'mlb.com', 'nhl.com',
   'cbssports.com', 'si.com', 'theathletic.com', 'bleacherreport.com',
-  'sportingnews.com',
+  'sportingnews.com', 'skysports.com', 'btsport.com',
+  'goal.com', 'transfermarkt.com', 'whoscored.com',
+  'espncricinfo.com', 'cricbuzz.com',
 ]);
 
 const LOW_TIER_SOCIAL = new Set([

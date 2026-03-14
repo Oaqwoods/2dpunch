@@ -304,6 +304,26 @@ create or replace trigger on_like_deleted
 alter table public.sources add column if not exists title text;
 alter table public.challenge_sources add column if not exists title text;
 
+-- Migration: re-point user_id FKs to public.profiles so PostgREST can resolve
+-- embedded joins like profiles(id, username) in takes/challenges/likes/notifications.
+-- Cascade chain is preserved: auth.users → profiles (cascade) → takes (cascade).
+alter table public.takes drop constraint if exists takes_user_id_fkey;
+alter table public.takes add constraint takes_user_id_fkey foreign key (user_id) references public.profiles(id) on delete cascade;
+
+alter table public.challenges drop constraint if exists challenges_user_id_fkey;
+alter table public.challenges add constraint challenges_user_id_fkey foreign key (user_id) references public.profiles(id) on delete cascade;
+
+alter table public.likes drop constraint if exists likes_user_id_fkey;
+alter table public.likes add constraint likes_user_id_fkey foreign key (user_id) references public.profiles(id) on delete cascade;
+
+alter table public.notifications drop constraint if exists notifications_user_id_fkey;
+alter table public.notifications add constraint notifications_user_id_fkey foreign key (user_id) references public.profiles(id) on delete cascade;
+
+alter table public.notifications drop constraint if exists notifications_actor_id_fkey;
+alter table public.notifications add constraint notifications_actor_id_fkey foreign key (actor_id) references public.profiles(id) on delete cascade;
+
+notify pgrst, 'reload schema';
+
 -- ─── HATE SPEECH / SLUR FILTER ──────────────────────────────────────────────
 -- Blocks known slurs and hate terms before insert on takes and challenges.
 -- Extend the regex alternation to add new terms as needed.
