@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   KeyboardAvoidingView,
   Platform,
@@ -248,6 +249,30 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
     }
   }
 
+  async function deleteTake() {
+    Alert.alert('Delete Take', 'Delete this take and all its challenges permanently?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          await supabase.from('takes').delete().eq('id', takeId);
+          navigation.goBack();
+        },
+      },
+    ]);
+  }
+
+  async function deleteChallenge(challengeId: string) {
+    Alert.alert('Delete Challenge', 'Delete your challenge?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          await supabase.from('challenges').delete().eq('id', challengeId);
+          setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
+        },
+      },
+    ]);
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -330,6 +355,13 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
           )}
           {alreadyChallenged && (
             <Text style={styles.alreadyChallenged}>You've already challenged this take</Text>
+          )}
+
+          {/* ── DELETE TAKE ── */}
+          {isOwner && (
+            <Pressable style={styles.deleteBtn} onPress={() => void deleteTake()}>
+              <Text style={styles.deleteBtnText}>🗑 Delete Take</Text>
+            </Pressable>
           )}
 
           {/* ── CHALLENGE FORM ── */}
@@ -458,6 +490,15 @@ export default function TakeDetailScreen({ route, navigation }: Props) {
                       {likedChallengeIds.has(c.id) ? '❤️' : '🤍'} {c.likes_count}
                     </Text>
                   </Pressable>
+                  {/* Delete challenge button (own challenges only) */}
+                  {c.user_id === myId && (
+                    <Pressable
+                      style={styles.deleteChallengeBtn}
+                      onPress={() => void deleteChallenge(c.id)}
+                    >
+                      <Text style={styles.deleteChallengeBtnText}>🗑 Delete</Text>
+                    </Pressable>
+                  )}
                 </View>
               ))}
             </>
@@ -524,6 +565,17 @@ const styles = StyleSheet.create({
   },
   challengeBtnText: { color: '#f59e0b', fontWeight: '700', fontSize: 15 },
   alreadyChallenged: { color: '#555', textAlign: 'center', fontSize: 13 },
+  deleteBtn: {
+    borderWidth: 1,
+    borderColor: '#ef444466',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  deleteBtnText: { color: '#ef4444', fontWeight: '600', fontSize: 14 },
+  deleteChallengeBtn: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 2, marginTop: 2 },
+  deleteChallengeBtnText: { color: '#ef444488', fontSize: 12 },
   challengeForm: {
     backgroundColor: '#1a1a1a',
     borderRadius: 14,

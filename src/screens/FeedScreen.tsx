@@ -28,6 +28,7 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [category, setCategory] = useState<'all' | Category>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'trust'>('recent');
+  const [feedType, setFeedType] = useState<'all' | 'following'>('all');
   const [error, setError] = useState('');
   const [myId, setMyId] = useState<string | null>(null);
   const [challengingTake, setChallengingTake] = useState<Take | null>(null);
@@ -42,6 +43,22 @@ export default function FeedScreen() {
       setError('');
 
       try {
+        // When Following feed is selected, resolve followed user IDs first
+        let followingIds: string[] | null = null;
+        if (feedType === 'following' && myId) {
+          const { data: followData } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', myId);
+          followingIds = (followData ?? []).map((f: { following_id: string }) => f.following_id);
+          if (followingIds.length === 0) {
+            setTakes([]);
+            setLoading(false);
+            setRefreshing(false);
+            return;
+          }
+        }
+
         let query = supabase
           .from('takes')
           .select(`
@@ -54,6 +71,9 @@ export default function FeedScreen() {
 
         if (category !== 'all') {
           query = query.eq('category', category);
+        }
+        if (followingIds !== null) {
+          query = query.in('user_id', followingIds);
         }
 
         const { data, error: err } = await query;
@@ -81,7 +101,7 @@ export default function FeedScreen() {
         setRefreshing(false);
       }
     },
-    [category, sortBy, myId]
+    [category, sortBy, feedType, myId]
   );
 
   useEffect(() => { void load(); }, [load]);
@@ -122,6 +142,19 @@ export default function FeedScreen() {
 
       {/* Filters */}
       <View style={styles.filters}>
+        <View style={styles.filterRow}>
+          {(['all', 'following'] as const).map((f) => (
+            <Pressable
+              key={f}
+              style={[styles.filterPill, feedType === f && styles.filterActive]}
+              onPress={() => setFeedType(f)}
+            >
+              <Text style={[styles.filterText, feedType === f && styles.filterTextActive]}>
+                {f === 'all' ? '🌐 For You' : '👥 Following'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
         <View style={styles.filterRow}>
           {CATEGORIES.map((c) => (
             <Pressable
@@ -174,7 +207,11 @@ export default function FeedScreen() {
             />
           }
           ListEmptyComponent={
-            <Text style={styles.empty}>No takes yet. Be the first to post one!</Text>
+            <Text style={styles.empty}>
+              {feedType === 'following'
+                ? 'Follow people to see their takes here'
+                : 'No takes yet. Be the first to post one!'}
+            </Text>
           }
           renderItem={({ item }) => (
             <TakeCard

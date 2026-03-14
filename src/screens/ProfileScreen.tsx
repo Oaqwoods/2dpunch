@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   SafeAreaView,
@@ -25,13 +26,21 @@ interface Props {
 
 export default function ProfileScreen({ userId, isSelf = false }: Props) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [myId, setMyId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [takes, setTakes] = useState<Take[]>([]);
   const [loading, setLoading] = useState(true);
+  const [likedTakeIds, setLikedTakeIds] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState(false);
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id ?? null));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,8 +59,32 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
       setBio(profileRes.data.bio);
     }
     setTakes(takesRes.data ?? []);
+
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    if (currentUser && !isSelf) {
+      // Check follow status
+      const { data: followData } = await supabase
+        .from('follows')
+        .select('follower_id')
+        .eq('follower_id', currentUser.id)
+        .eq('following_id', userId)
+        .maybeSingle();
+      setIsFollowing(!!followData);
+
+      // Attach liked flags for this user's takes
+      const takeIds = (takesRes.data ?? []).map((t: Take) => t.id);
+      if (takeIds.length > 0) {
+        const { data: likedData } = await supabase
+          .from('likes')
+          .select('take_id')
+          .eq('user_id', currentUser.id)
+          .in('take_id', takeIds);
+        setLikedTakeIds(new Set((likedData ?? []).map((l: { take_id: string }) => l.take_id)));
+      }
+    }
+
     setLoading(false);
-  }, [userId]);
+  }, [userId, isSelf]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -72,6 +105,54 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
 
   async function signOut() {
     await supabase.auth.signOut();
+  }
+
+  async function toggleFollow() {
+    if (!myId || followLoading) return;
+    setFollowLoading(true);
+    if (isFollowing) {
+      await supabase.from('follows').delete()
+        .eq('follower_id', myId)
+        .eq('following_id', userId);
+      setIsFollowing(false);
+      setProfile((p) => p ? { ...p, followers_count: Math.max((p.followers_count ?? 0) - 1, 0) } : p);
+    } else {
+      await supabase.from('follows').insert({ follower_id: myId, following_id: userId });
+      setIsFollowing(true);
+      setProfile((p) => p ? { ...p, followers_count: (p.followers_count ?? 0) + 1 } : p);
+    }
+    setFollowLoading(false);
+  }
+
+  async function handleLike(takeId: string, currentlyLiked: boolean) {
+    if (!myId) return;
+    if (currentlyLiked) {
+      await supabase.from('likes').delete().eq('user_id', myId).eq('take_id', takeId);
+      setLikedTakeIds((prev) => { const s = new Set(prev); s.delete(takeId); return s; });
+      setTakes((prev) => prev.map((t) => t.id === takeId
+        ? { ...t, likes_count: Math.max(t.likes_count - 1, 0), user_liked: false }
+        : t
+      ));
+    } else {
+      await supabase.from('likes').insert({ user_id: myId, take_id: takeId });
+      setLikedTakeIds((prev) => new Set([...prev, takeId]));
+      setTakes((prev) => prev.map((t) => t.id === takeId
+        ? { ...t, likes_count: t.likes_count + 1, user_liked: true }
+        : t
+      ));
+    }
+  }
+
+  async function deleteTake(takeId: string) {
+    Alert.alert('Delete Take', 'Delete this take permanently?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          await supabase.from('takes').delete().eq('id', takeId);
+          setTakes((prev) => prev.filter((t) => t.id !== takeId));
+        },
+      },
+    ]);
   }
 
   if (loading) {
@@ -152,6 +233,16 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
                   </View>
                   <View style={styles.statDivider} />
                   <View style={styles.statItem}>
+                    <Text style={styles.statNum}>{profile?.followers_count ?? 0}</Text>
+                    <Text style={styles.statLabel}>Followers</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNum}>{profile?.following_count ?? 0}</Text>
+                    <Text style={styles.statLabel}>Following</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statItem}>
                     <TrustBadge score={profile?.avg_trust_score ?? 0} size="sm" />
                     <Text style={styles.statLabel}>Avg Trust</Text>
                   </View>
@@ -166,6 +257,17 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
                     </Pressable>
                   </View>
                 )}
+                {!isSelf && myId && (
+                  <Pressable
+                    style={[styles.followBtn, isFollowing && styles.followingBtn]}
+                    onPress={() => void toggleFollow()}
+                    disabled={followLoading}
+                  >
+                    <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
+                      {followLoading ? '…' : isFollowing ? 'Following' : 'Follow'}
+                    </Text>
+                  </Pressable>
+                )}
               </>
             )}
             <Text style={styles.takesHeader}>Takes</Text>
@@ -174,9 +276,10 @@ export default function ProfileScreen({ userId, isSelf = false }: Props) {
         ListEmptyComponent={<Text style={styles.empty}>No takes yet</Text>}
         renderItem={({ item }) => (
           <TakeCard
-            take={item}
-            onLike={() => {}}
+            take={{ ...item, user_liked: likedTakeIds.has(item.id) }}
+            onLike={(takeId) => void handleLike(takeId, likedTakeIds.has(takeId))}
             onProfile={(uid) => nav.navigate('Profile', { userId: uid })}
+            onLongPress={isSelf ? (t) => deleteTake(t.id) : undefined}
           />
         )}
       />
@@ -222,6 +325,17 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   signOutText: { color: '#ef4444', fontWeight: '600', fontSize: 13 },
+  followBtn: {
+    borderWidth: 1,
+    borderColor: '#1f6feb',
+    paddingHorizontal: 28,
+    paddingVertical: 9,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  followBtnText: { color: '#1f6feb', fontWeight: '700', fontSize: 14 },
+  followingBtn: { backgroundColor: '#1f6feb', borderColor: '#1f6feb' },
+  followingBtnText: { color: '#fff' },
   takesHeader: { color: '#888', fontWeight: '700', fontSize: 14, alignSelf: 'flex-start', marginTop: 10 },
   editForm: { width: '100%', gap: 8 },
   editInput: {

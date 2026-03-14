@@ -428,3 +428,104 @@ create or replace trigger on_suggestion_unvote
   after delete on public.suggestion_votes
   for each row execute function public.decrement_suggestion_votes();
 
+-- ─────────────────────────────────────────────
+-- MIGRATION 3: follows table + profile follower counts
+-- ─────────────────────────────────────────────
+
+create table if not exists public.follows (
+  follower_id  uuid not null references public.profiles(id) on delete cascade,
+  following_id uuid not null references public.profiles(id) on delete cascade,
+  created_at   timestamptz not null default now(),
+  primary key (follower_id, following_id)
+);
+
+alter table public.profiles
+  add column if not exists followers_count integer not null default 0,
+  add column if not exists following_count integer not null default 0;
+
+alter table public.follows enable row level security;
+
+create policy "follows readable by anyone"
+  on public.follows for select using (true);
+
+create policy "users can follow"
+  on public.follows for insert to authenticated
+  with check (auth.uid() = follower_id);
+
+create policy "users can unfollow"
+  on public.follows for delete to authenticated
+  using (auth.uid() = follower_id);
+
+create or replace function public.trg_follows_stats()
+returns trigger language plpgsql security definer as $$
+begin
+  if TG_OP = 'INSERT' then
+    update public.profiles set following_count = following_count + 1 where id = new.follower_id;
+    update public.profiles set followers_count = followers_count + 1 where id = new.following_id;
+  elsif TG_OP = 'DELETE' then
+    update public.profiles set following_count = greatest(following_count - 1, 0) where id = old.follower_id;
+    update public.profiles set followers_count = greatest(followers_count - 1, 0) where id = old.following_id;
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists on_follows_stats on public.follows;
+create trigger on_follows_stats
+  after insert or delete on public.follows
+  for each row execute function public.trg_follows_stats();
+
+
+-- ─────────────────────────────────────────────
+-- MIGRATION 4: profile stats auto-update on takes insert/delete
+-- ─────────────────────────────────────────────
+
+create or replace function public.refresh_profile_stats(p_user_id uuid)
+returns void language plpgsql security definer as $$
+begin
+  update public.profiles
+  set
+    takes_count     = (select count(*) from public.takes where user_id = p_user_id),
+    avg_trust_score = coalesce(
+      (select avg(trust_score) from public.takes where user_id = p_user_id),
+      0
+    )
+  where id = p_user_id;
+end;
+$$;
+
+create or replace function public.trg_take_stats()
+returns trigger language plpgsql security definer as $$
+begin
+  if TG_OP = 'INSERT' then
+    perform public.refresh_profile_stats(new.user_id);
+  elsif TG_OP = 'DELETE' then
+    perform public.refresh_profile_stats(old.user_id);
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists on_take_stats on public.takes;
+create trigger on_take_stats
+  after insert or delete on public.takes
+  for each row execute function public.trg_take_stats();
+
+
+-- ─────────────────────────────────────────────
+-- MIGRATION 5: fix decrement_likes to handle challenge unlikes
+-- ─────────────────────────────────────────────
+
+create or replace function public.decrement_likes()
+returns trigger language plpgsql security definer as $$
+begin
+  if old.take_id is not null then
+    update public.takes set likes_count = greatest(likes_count - 1, 0) where id = old.take_id;
+  end if;
+  if old.challenge_id is not null then
+    update public.challenges set likes_count = greatest(likes_count - 1, 0) where id = old.challenge_id;
+  end if;
+  return old;
+end;
+$$;
+

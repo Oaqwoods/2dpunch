@@ -19,6 +19,14 @@ export interface Profile {
   bio: string;
   avg_trust_score: number;
   takes_count: number;
+  followers_count: number;
+  following_count: number;
+  created_at: string;
+}
+
+export interface Follow {
+  follower_id: string;
+  following_id: string;
   created_at: string;
 }
 
@@ -99,6 +107,7 @@ export type RootStackParamList = {
 
 export type TabParamList = {
   Feed: undefined;
+  Search: undefined;
   Trending: undefined;
   Notifications: undefined;
   MyProfile: undefined;

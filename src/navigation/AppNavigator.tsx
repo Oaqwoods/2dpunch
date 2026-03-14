@@ -9,6 +9,7 @@ import type { RootStackParamList, TabParamList } from '../types';
 
 const supabase = createSupabaseClient();
 import FeedScreen from '../screens/FeedScreen';
+import SearchScreen from '../screens/SearchScreen';
 import TrendingScreen from '../screens/TrendingScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -23,6 +24,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
     Feed: '🏠',
+    Search: '🔍',
     Trending: '🔥',
     Notifications: '🔔',
     MyProfile: '👤',
@@ -88,6 +90,7 @@ function MainTabs({ userId }: { userId: string }) {
       })}
     >
       <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="Search" component={SearchScreen} />
       <Tab.Screen name="Trending" component={TrendingScreen} />
       <Tab.Screen
         name="Notifications"
