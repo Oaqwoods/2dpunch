@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 import { createSupabaseClient } from '../lib/supabase';
@@ -82,6 +82,11 @@ export default function FeedScreen() {
   );
 
   useEffect(() => { void load(); }, [load]);
+
+  // Reload whenever we navigate back to this screen (e.g. after posting a take)
+  useFocusEffect(
+    useCallback(() => { void load(); }, [load])
+  );
 
   const handleLike = async (takeId: string, liked: boolean) => {
     if (!myId) return;
