@@ -8,15 +8,26 @@ import type { TrustTier } from '../types';
  */
 
 const HIGH_TIER_DOMAINS = new Set([
-  // Government & academic
-  '.gov', '.edu', 'pubmed.ncbi.nlm.nih.gov', 'scholar.google.com',
+  // Government & academic suffixes
+  '.gov', '.edu',
+  // Scientific journals & databases
+  'pubmed.ncbi.nlm.nih.gov', 'scholar.google.com',
   'nature.com', 'science.org', 'thelancet.com', 'nejm.org',
-  'jamanetwork.com', 'bmj.com', 'pnas.org', 'cdc.gov', 'who.int',
+  'jamanetwork.com', 'bmj.com', 'pnas.org', 'cell.com',
+  'jstor.org', 'ssrn.com', 'arxiv.org',
+  // Health & public health authorities
+  'cdc.gov', 'who.int', 'nih.gov',
+  // Intergovernmental & legal
   'un.org', 'supremecourt.gov', 'congress.gov',
-  // Wire services
+  'europa.eu', 'parliament.uk', 'icrc.org',
+  // International financial institutions
+  'imf.org', 'worldbank.org',
+  // Data & research orgs
+  'ourworldindata.org', 'transparency.org',
+  // Wire services (primary sourcing)
   'apnews.com', 'reuters.com', 'afp.com',
   // Major nonpartisan fact-checkers
-  'politifact.com', 'factcheck.org', 'snopes.com',
+  'politifact.com', 'factcheck.org', 'snopes.com', 'fullfact.org',
 ]);
 
 const MID_TIER_DOMAINS = new Set([
@@ -28,24 +39,69 @@ const MID_TIER_DOMAINS = new Set([
   'politico.com', 'thehill.com', 'usatoday.com', 'latimes.com',
   'nypost.com', 'newsweek.com', 'forbes.com', 'businessinsider.com',
   'motherjones.com', 'thedailybeast.com', 'vox.com', 'slate.com',
-  // International news
-  'aljazeera.com', 'skynews.com', 'sky.com',
+  // Investigative / long-form
+  'propublica.org', 'theintercept.com',
+  // Business & finance
+  'bloomberg.com', 'marketwatch.com', 'cnbc.com', 'barrons.com',
+  // Tech journalism
+  'techcrunch.com', 'wired.com', 'arstechnica.com', 'theverge.com',
+  'zdnet.com', 'cnet.com', 'engadget.com',
+  // Culture & entertainment
+  'rollingstone.com', 'variety.com', 'hollywoodreporter.com',
+  // Foreign policy & analysis
+  'foreignpolicy.com', 'foreignaffairs.com', 'cfr.org',
+  // Research & data journalism
+  'statista.com', 'pewresearch.org', 'fivethirtyeight.com',
+  // UK news
   'independent.co.uk', 'telegraph.co.uk', 'thetimes.co.uk',
   'thesun.co.uk', 'dailymail.co.uk', 'mirror.co.uk', 'express.co.uk',
-  'abc.net.au', 'smh.com.au', 'theage.com.au', 'abc.net.au',
+  'eveningstandard.co.uk', 'inews.co.uk',
+  // Irish news
+  'irishtimes.com', 'irishexaminer.com', 'rte.ie',
+  // Australian news
+  'abc.net.au', 'smh.com.au', 'theage.com.au', 'news.com.au',
+  // Canadian news
   'cbc.ca', 'globeandmail.com', 'torontostar.com', 'nationalpost.com',
+  // European news (EN + native)
   'lemonde.fr', 'lefigaro.fr', 'dw.com', 'spiegel.de',
-  'elpais.com', 'corriere.it', 'ansa.it',
+  'elpais.com', 'corriere.it', 'ansa.it', 'euractiv.com',
+  'theguardian.com', 'politico.eu',
+  // Middle East & Africa
+  'aljazeera.com', 'skynews.com', 'sky.com',
+  'arabnews.com', 'middleeasteye.net',
+  'africanews.com', 'mg.co.za', 'dailymaverick.co.za',
+  // Israel
   'haaretz.com', 'timesofisrael.com', 'jpost.com',
+  // Eastern Europe
+  'kyivindependent.com', 'meduza.io',
+  // Asia-Pacific
   'scmp.com', 'straitstimes.com', 'japantimes.co.jp',
   'hindustantimes.com', 'thehindu.com', 'ndtv.com', 'timesofindia.com',
-  'arabnews.com', 'middleeasteye.net',
-  // Sports
-  'espn.com', 'nfl.com', 'nba.com', 'mlb.com', 'nhl.com',
-  'cbssports.com', 'si.com', 'theathletic.com', 'bleacherreport.com',
-  'sportingnews.com', 'skysports.com', 'btsport.com',
-  'goal.com', 'transfermarkt.com', 'whoscored.com',
+  'nzherald.co.nz',
+  // ── SPORTS ──────────────────────────────────────────────────────────────────
+  // US sports media
+  'espn.com', 'cbssports.com', 'si.com', 'theathletic.com',
+  'bleacherreport.com', 'sportingnews.com', 'nbcsports.com',
+  'foxsports.com', 'deadspin.com',
+  // US league official sites
+  'nfl.com', 'nba.com', 'mlb.com', 'nhl.com', 'mls.soccer.com',
+  'wnba.com', 'nwsl.com', 'pgatour.com', 'usopen.org',
+  // UK/EU football
+  'skysports.com', 'btsport.com', 'goal.com', '90min.com',
+  'premierleague.com', 'football365.com', 'givemesport.com',
+  'talksport.com', 'sportbible.com',
+  // Football stats & transfers
+  'transfermarkt.com', 'whoscored.com', 'fbref.com', 'understat.com',
+  // Global governing bodies
+  'fifa.com', 'uefa.com', 'olympics.com', 'worldathletics.org',
+  'worldrugby.org', 'fiba.basketball', 'icc-cricket.com',
+  'atptour.com', 'wtatour.com', 'formula1.com', 'ufc.com',
+  // Cricket
   'espncricinfo.com', 'cricbuzz.com',
+  // Reference / stats
+  'basketball-reference.com', 'baseball-reference.com',
+  'pro-football-reference.com', 'hockey-reference.com',
+  'statmuse.com',
 ]);
 
 const LOW_TIER_SOCIAL = new Set([
