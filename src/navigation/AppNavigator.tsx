@@ -1,16 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View, StyleSheet } from 'react-native';
+import { Pressable, Text, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createSupabaseClient } from '../lib/supabase';
 import type { RootStackParamList, TabParamList } from '../types';
 
 const supabase = createSupabaseClient();
 import FeedScreen from '../screens/FeedScreen';
+import TrendingScreen from '../screens/TrendingScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import TakeDetailScreen from '../screens/TakeDetailScreen';
 import CreateTakeScreen from '../screens/CreateTakeScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import SuggestSourceScreen from '../screens/SuggestSourceScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -18,6 +23,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   const icons: Record<string, string> = {
     Feed: '🏠',
+    Trending: '🔥',
     Notifications: '🔔',
     MyProfile: '👤',
   };
@@ -25,6 +31,18 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
     <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>
       {icons[label] ?? '●'}
     </Text>
+  );
+}
+
+function SettingsButton() {
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  return (
+    <Pressable
+      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingHorizontal: 12 })}
+      onPress={() => nav.navigate('Settings')}
+    >
+      <Text style={{ fontSize: 20 }}>⚙️</Text>
+    </Pressable>
   );
 }
 
@@ -70,6 +88,7 @@ function MainTabs({ userId }: { userId: string }) {
       })}
     >
       <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="Trending" component={TrendingScreen} />
       <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}
@@ -77,8 +96,10 @@ function MainTabs({ userId }: { userId: string }) {
       />
       <Tab.Screen
         name="MyProfile"
-        children={() => <ProfileScreen userId={userId} isSelf />}
-      />
+        options={{ headerShown: true, headerTitle: 'Profile', headerRight: () => <SettingsButton />, headerStyle: { backgroundColor: '#0f0f0f' }, headerTintColor: '#fff' }}
+      >
+        {() => <ProfileScreen userId={userId} isSelf />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }
@@ -117,6 +138,19 @@ export default function AppNavigator({ userId }: { userId: string }) {
           />
         )}
       </Stack.Screen>
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ title: 'Settings', presentation: 'modal' }}
+      />
+      <Stack.Screen
+        name="SuggestSource"
+        component={SuggestSourceScreen}
+        options={{ title: 'Suggest a Source' }}
+      />
     </Stack.Navigator>
   );
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _styles = StyleSheet.create({});

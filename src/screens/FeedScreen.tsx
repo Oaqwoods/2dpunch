@@ -12,6 +12,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Haptics from 'expo-haptics';
 import { createSupabaseClient } from '../lib/supabase';
+import { parseSupabaseError } from '../lib/errorUtils';
 import TakeCard from '../components/TakeCard';
 import SkeletonCard from '../components/SkeletonCard';
 import QuickChallengeSheet from '../components/QuickChallengeSheet';
@@ -74,7 +75,7 @@ export default function FeedScreen() {
           setTakes(data ?? []);
         }
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : JSON.stringify(e));
+        setError(parseSupabaseError(e));
       } finally {
         setLoading(false);
         setRefreshing(false);

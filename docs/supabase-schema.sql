@@ -346,3 +346,85 @@ create or replace trigger check_take_hate_speech
 create or replace trigger check_challenge_hate_speech
   before insert on public.challenges
   for each row execute function public.check_hate_speech();
+
+-- ─── MIGRATION: Source suggestions + community voting ────────────────────────
+-- Run this block once in a new Supabase SQL Editor query tab.
+
+create table if not exists public.source_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  domain text not null,
+  url_example text,
+  reason text not null check (char_length(reason) between 10 and 500),
+  votes integer not null default 0,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now(),
+  unique (domain)
+);
+
+alter table public.source_suggestions enable row level security;
+
+create policy "suggestions readable by authenticated users"
+  on public.source_suggestions for select to authenticated using (true);
+
+create policy "users can insert suggestions"
+  on public.source_suggestions for insert to authenticated
+  with check (
+    auth.uid() = user_id
+    -- One suggestion per domain across all users (unique constraint handles this)
+    -- Rate limit: max 5 suggestions per day
+    and (
+      select count(*) from public.source_suggestions
+      where user_id = auth.uid()
+      and created_at > now() - interval '1 day'
+    ) < 5
+  );
+
+create index if not exists idx_source_suggestions_votes on public.source_suggestions (votes desc);
+
+create table if not exists public.suggestion_votes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  suggestion_id uuid not null references public.source_suggestions(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (user_id, suggestion_id)
+);
+
+alter table public.suggestion_votes enable row level security;
+
+create policy "votes readable by authenticated users"
+  on public.suggestion_votes for select to authenticated using (true);
+
+create policy "users can insert own votes"
+  on public.suggestion_votes for insert to authenticated
+  with check (auth.uid() = user_id);
+
+create policy "users can delete own votes"
+  on public.suggestion_votes for delete to authenticated using (auth.uid() = user_id);
+
+-- Increment vote count on upvote
+create or replace function public.increment_suggestion_votes()
+returns trigger language plpgsql security definer as $$
+begin
+  update public.source_suggestions set votes = votes + 1 where id = new.suggestion_id;
+  return new;
+end;
+$$;
+
+create or replace trigger on_suggestion_vote
+  after insert on public.suggestion_votes
+  for each row execute function public.increment_suggestion_votes();
+
+-- Decrement vote count on un-vote
+create or replace function public.decrement_suggestion_votes()
+returns trigger language plpgsql security definer as $$
+begin
+  update public.source_suggestions set votes = greatest(votes - 1, 0) where id = old.suggestion_id;
+  return old;
+end;
+$$;
+
+create or replace trigger on_suggestion_unvote
+  after delete on public.suggestion_votes
+  for each row execute function public.decrement_suggestion_votes();
+

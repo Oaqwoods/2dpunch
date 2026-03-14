@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { createSupabaseClient } from '../lib/supabase';
 import { extractDomain, scoreDomain, calcAverageTrust, tierColor } from '../lib/trustScore';
 import { fetchUrlTitle } from '../lib/urlMetadata';
+import { parseSupabaseError } from '../lib/errorUtils';
 import TrustBadge from '../components/TrustBadge';
 import Toast from '../components/Toast';
 import type { Category } from '../types';
@@ -140,13 +141,7 @@ export default function CreateTakeScreen() {
       setToast({ visible: true, message: 'Take posted! 🔥' });
       setTimeout(() => nav.goBack(), 1200);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to post take';
-      // Rate limit handling
-      if (msg.includes('row-level') || msg.includes('policy')) {
-        setError('You\'ve posted too many takes this hour. Try again later.');
-      } else {
-        setError(msg);
-      }
+      setError(parseSupabaseError(e));
     } finally {
       setSubmitting(false);
     }

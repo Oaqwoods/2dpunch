@@ -1,3 +1,14 @@
+export interface SourceSuggestion {
+  id: string;
+  user_id: string;
+  domain: string;
+  url_example: string | null;
+  reason: string;
+  votes: number;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+}
+
 export type Category = 'politics' | 'sports';
 export type TrustTier = 'high' | 'mid' | 'low';
 export type NotificationType = 'challenge' | 'like';
@@ -82,10 +93,13 @@ export type RootStackParamList = {
   TakeDetail: { takeId: string };
   CreateTake: undefined;
   Profile: { userId: string };
+  Settings: undefined;
+  SuggestSource: undefined;
 };
 
 export type TabParamList = {
   Feed: undefined;
+  Trending: undefined;
   Notifications: undefined;
   MyProfile: undefined;
 };

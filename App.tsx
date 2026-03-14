@@ -19,13 +19,22 @@ import AppNavigator from './src/navigation/AppNavigator';
 
 const supabase = createSupabaseClient();
 
+function FeatureRow({ icon, text }: { icon: string; text: string }) {
+  return (
+    <View style={styles.featureRow}>
+      <Text style={styles.featureIcon}>{icon}</Text>
+      <Text style={styles.featureText}>{text}</Text>
+    </View>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authMode, setAuthMode] = useState<'landing' | 'signin' | 'signup'>('landing');
   const [submitting, setSubmitting] = useState(false);
 
   const configError = useMemo(
@@ -85,6 +94,41 @@ export default function App() {
   }
 
   if (!session) {
+    // Show landing hero until user taps "Get Started" / "Sign In"
+    if (!authMode || authMode === 'landing') {
+      return (
+        <SafeAreaView style={styles.container}>
+          <StatusBar style="light" />
+          <View style={styles.heroWrap}>
+            <Text style={styles.logo}>2dpunch</Text>
+            <Text style={styles.tagline}>Debate with receipts.</Text>
+
+            <View style={styles.features}>
+              <FeatureRow icon="🎯" text="Post hot takes on politics & sports" />
+              <FeatureRow icon="📎" text="Back every claim with a source URL" />
+              <FeatureRow icon="🔬" text="Sources are scored for credibility — automatically" />
+              <FeatureRow icon="⚔️" text="Challenge takes you disagree with, with your own receipts" />
+              <FeatureRow icon="🔥" text="The most trusted, most debated takes rise to the top" />
+            </View>
+
+            <Pressable
+              style={[styles.primaryBtn, { marginTop: 32 }]}
+              onPress={() => setAuthMode('signup')}
+            >
+              <Text style={styles.primaryBtnText}>Get Started — It's Free</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.secondaryBtn}
+              onPress={() => setAuthMode('signin')}
+            >
+              <Text style={styles.secondaryBtnText}>Sign In</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
     return (
       <KeyboardAvoidingView
         style={styles.container}
@@ -92,8 +136,13 @@ export default function App() {
       >
         <StatusBar style="light" />
         <View style={styles.authWrap}>
+          <Pressable onPress={() => setAuthMode('landing')} style={styles.backBtn}>
+            <Text style={styles.backText}>‹ Back</Text>
+          </Pressable>
           <Text style={styles.logo}>2dpunch</Text>
-          <Text style={styles.tagline}>Debate with receipts.</Text>
+          <Text style={styles.tagline}>
+            {authMode === 'signup' ? 'Create your account' : 'Welcome back'}
+          </Text>
 
           <TextInput
             style={styles.input}
@@ -200,4 +249,27 @@ const styles = StyleSheet.create({
   successMessage: { color: '#22c55e' },
   errorTitle: { color: '#ef4444', fontSize: 20, fontWeight: '700', marginBottom: 10 },
   errorBody: { color: '#888', paddingHorizontal: 24, textAlign: 'center' },
+  // Landing
+  heroWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  features: { width: '100%', marginTop: 28, gap: 14 },
+  featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  featureIcon: { fontSize: 18, marginTop: 1 },
+  featureText: { color: '#ccc', fontSize: 14, flex: 1, lineHeight: 20 },
+  secondaryBtn: {
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 12,
+    width: '100%',
+  },
+  secondaryBtnText: { color: '#888', fontWeight: '600', fontSize: 15 },
+  backBtn: { marginBottom: 8 },
+  backText: { color: '#555', fontSize: 15 },
 });
