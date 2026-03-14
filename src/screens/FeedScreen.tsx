@@ -56,15 +56,17 @@ export default function FeedScreen() {
         }
 
         const { data, error: err } = await query;
-        if (err) throw err;
+        if (err) throw new Error(err.message ?? JSON.stringify(err));
 
         // Attach user_liked flag
-        if (data && myId) {
-          const { data: liked } = await supabase
+        if (data && data.length > 0 && myId) {
+          const { data: liked, error: likedErr } = await supabase
             .from('likes')
             .select('take_id')
             .eq('user_id', myId)
             .in('take_id', data.map((t: Take) => t.id));
+
+          if (likedErr) throw new Error(likedErr.message ?? JSON.stringify(likedErr));
 
           const likedSet = new Set((liked ?? []).map((l: { take_id: string }) => l.take_id));
           setTakes(data.map((t: Take) => ({ ...t, user_liked: likedSet.has(t.id) })));
@@ -72,7 +74,7 @@ export default function FeedScreen() {
           setTakes(data ?? []);
         }
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'Failed to load takes');
+        setError(e instanceof Error ? e.message : JSON.stringify(e));
       } finally {
         setLoading(false);
         setRefreshing(false);
